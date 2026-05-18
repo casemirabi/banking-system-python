@@ -1,161 +1,167 @@
-import banking
-import users
-from datetime import datetime
+from classes import PessoaFisica, ContaCorrente, Deposito, Saque
 
-users.carregarUsuarios()
-valorEscolhido = 0
 
-def mostrarExtrato(usuario, tipo_filtro=None):
-    print("\n==== EXTRATO ====")
+clientes = []
+contas = []
 
-    movimentacoes = usuario['extrato']
 
-    if tipo_filtro:
-        movimentacoes = [
-            item for item in movimentacoes
-            if item["tipo"] == tipo_filtro
-        ]
+def buscar_cliente_por_cpf(cpf):
+    # Busca um cliente na lista usando o atributo cpf do objeto.
+    for cliente in clientes:
+        if cliente.cpf == cpf:
+            return cliente
 
-    if not movimentacoes:
-        print("Nenhuma movimentação encontrada.")
+    return None
+
+
+def criar_cliente():
+    nome = input("Digite o nome: ")
+    cpf = input("Digite o CPF: ")
+    data_nascimento = input("Digite a data de nascimento: ")
+    endereco = input("Digite o endereço: ")
+
+    cliente_existente = buscar_cliente_por_cpf(cpf)
+
+    if cliente_existente:
+        print("Já existe cliente com esse CPF.")
+        return
+
+    cliente = PessoaFisica(
+        nome=nome,
+        cpf=cpf,
+        data_nascimento=data_nascimento,
+        endereco=endereco
+    )
+
+    clientes.append(cliente)
+    print("Cliente criado com sucesso!")
+
+
+def criar_conta():
+    cpf = input("Digite o CPF do cliente: ")
+    cliente = buscar_cliente_por_cpf(cpf)
+
+    if not cliente:
+        print("Cliente não encontrado.")
+        return
+
+    numero_conta = len(contas) + 1
+
+    conta = ContaCorrente.nova_conta(
+        cliente=cliente,
+        numero=numero_conta
+    )
+
+    cliente.adicionar_conta(conta)
+    contas.append(conta)
+
+    print("Conta criada com sucesso!")
+
+
+def listar_contas():
+    if not contas:
+        print("Nenhuma conta cadastrada.")
+        return
+
+    for conta in contas:
+        print("=" * 30)
+        print(f"Agência: {conta.agencia}")
+        print(f"Conta: {conta.numero}")
+        print(f"Cliente: {conta.cliente.nome}")
+        print(f"CPF: {conta.cliente.cpf}")
+        print(f"Saldo: R${conta.saldo:.2f}")
+
+
+def selecionar_conta_por_cpf():
+    cpf = input("Digite o CPF do cliente: ")
+    cliente = buscar_cliente_por_cpf(cpf)
+
+    if not cliente:
+        print("Cliente não encontrado.")
+        return None
+
+    if not cliente.contas:
+        print("Cliente não possui conta.")
+        return None
+
+    return cliente.contas[0]
+
+
+def depositar():
+    conta = selecionar_conta_por_cpf()
+
+    if not conta:
+        return
+
+    valor = float(input("Digite o valor do depósito: "))
+
+    transacao = Deposito(valor)
+    conta.cliente.realizar_transacao(conta, transacao)
+
+
+def sacar():
+    conta = selecionar_conta_por_cpf()
+
+    if not conta:
+        return
+
+    valor = float(input("Digite o valor do saque: "))
+
+    transacao = Saque(valor)
+    conta.cliente.realizar_transacao(conta, transacao)
+
+
+def exibir_extrato():
+    conta = selecionar_conta_por_cpf()
+
+    if not conta:
+        return
+
+    print("\n========== EXTRATO ==========")
+
+    if not conta.historico.transacoes:
+        print("Nenhuma movimentação realizada.")
     else:
-        for item in movimentacoes:
-            print(f"{item['data']} - {item['tipo'].capitalize()} de R${item['valor']}")
+        for transacao in conta.historico.transacoes:
+            print(
+                f"{transacao['data']} - "
+                f"{transacao['tipo']} de R${transacao['valor']:.2f}"
+            )
 
-    print(f"\nSaldo atual: R${usuario['saldo']}")
-    print("===================\n")
+    print(f"\nSaldo atual: R${conta.saldo:.2f}")
+    print("=============================")
 
-def quantidadeDeTransacoes(usuario):
-    contador = 0
-    hoje = datetime.today().strftime("%d/%m/$Y")
 
-    for extract in usuario["extrato"]:
-        data_transacao = extract["data"].split()[0]
-
-        if extract["tipo"] == "deposito" and data_transacao == hoje:
-            contador += 1
-
-    if contador >= 10:
-        print(f"Excedeu o limite do dia! Você fez {contador} depósitos hoje.")
-        return False
-    else:
-        return True
-
-def formatoDataHora(data):
-    mascaraPTBR = "%d/%m/%Y %H:%M"
-    return data.strftime(mascaraPTBR)
-
-def valorDaTransacao():
-    global valorEscolhido
-    valorEscolhido = int(input("Digite um valor: "))
-    return valorEscolhido
-    
 def menu():
-    print("\n===== Digite uma opção: =====")
-    print("1: Realizar um deposito")
-    print("2: Fazer um saque")
-    print("3: Extrato")
-    print("4: Criar conta")
-    print("5: Listar Contas")
-    print("6: Sair")
-    
-while (True):
-    menu()
-    option = input("\nEscolha uma opção: ")
-    
-    if option == "1":
-        cpf = input("Digite o CPF do usuário: ")
-        usuario = users.buscarUsuarioPorCPF(cpf)
-        
-        if not usuario:
-            print("Usuário não encontrado.")
-            continue
-        
-        result = quantidadeDeTransacoes(usuario)
-        
-        if result:
-            valorDaTransacao()
-            
-            sucesso = banking.deposito(usuario, valorEscolhido)
-            
-            if sucesso:
-                dataHoraAtual = datetime.now()
-                dataHoraAtual = formatoDataHora(dataHoraAtual)
-                #usuario["extrato"].append(f"{dataHoraAtual} - Deposito de R${valorEscolhido}")
-                usuario["extrato"].append({
-                    "tipo": "deposito",
-                    "valor": valorEscolhido,
-                    "data": dataHoraAtual
-                })
-                
-                users.salvarUsuarios()
-            
-        else:
-            print("Você excedeu o limite de depósitos do dia!")
-    
+    while True:
+        print("\n========= MENU =========")
+        print("1 - Criar cliente")
+        print("2 - Criar conta")
+        print("3 - Depositar")
+        print("4 - Sacar")
+        print("5 - Exibir extrato")
+        print("6 - Listar contas")
+        print("0 - Sair")
 
-    if option == "2":
-        
-        cpf = input("Digite o CPF do usuário: ")
-        usuario = users.buscarUsuarioPorCPF(cpf)
-        
-        if not usuario:
-            print("Usuário não encontrado.")
-            continue
-        
-        valorDaTransacao()
-        sucesso = banking.saque(usuario, valorEscolhido)
-        
-        if sucesso:
-            dataHoraAtual = datetime.now()
-            dataHoraAtual = formatoDataHora(dataHoraAtual)
-            #usuario["extrato"].append(f"{dataHoraAtual} - Saque de R${valorEscolhido}")
-            usuario["extrato"].append({
-                    "tipo": "saque",
-                    "valor": valorEscolhido,
-                    "data": dataHoraAtual
-                })
-            users.salvarUsuarios()
+        opcao = input("Escolha uma opção: ")
 
-
-
-    if option == "3":
-        cpf = input("Digite o CPF do usuário: ")
-        usuario = users.buscarUsuarioPorCPF(cpf)
-
-        if not usuario:
-            print("Usuário não encontrado.")
-            continue
-
-        print("\n1 - Mostrar tudo")
-        print("2 - Apenas depósitos")
-        print("3 - Apenas saques")
-
-        filtro = input("Escolha uma opção: ")
-
-        if filtro == "1":
-            mostrarExtrato(usuario)
-        elif filtro == "2":
-            mostrarExtrato(usuario, "deposito")
-        elif filtro == "3":
-            mostrarExtrato(usuario, "saque")
+        if opcao == "1":
+            criar_cliente()
+        elif opcao == "2":
+            criar_conta()
+        elif opcao == "3":
+            depositar()
+        elif opcao == "4":
+            sacar()
+        elif opcao == "5":
+            exibir_extrato()
+        elif opcao == "6":
+            listar_contas()
+        elif opcao == "0":
+            print("Saindo...")
+            break
         else:
             print("Opção inválida.")
-            
 
-    if option == "4":
-        print("\n ==== CRIANDO UMA NOVA CONTA ====")
-        users.criarUsuario()
-        print(users.contas)
-                    
 
-    if option == "5":
-        print("\n ==== LISTANDO CONTAS ====")
-        users.listarContas()
-            
-    if option == "6":
-        print("Saindo...")
-        break
-    
-    
-
+menu()
